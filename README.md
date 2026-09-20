@@ -201,8 +201,5 @@ En la lista de libros me encontré con que DemoQA **ya no usa ReactTable**. Los 
 
 **El mensaje de la política de contraseñas no coincide con lo que valida.** Dice pedir "one non alphanumeric character", pero rechaza una contraseña terminada en punto y acepta la misma con `@`.
 
-## Alcance actual
-
-Los cinco puntos del desafío están entregados. Si siguiera, agregaría la ejecución en integración continua y la creación del usuario de prueba por API como precondición, que es justo lo que recomiendo en el estudio de factibilidad.
 
 Referencias: [instalación de Cucumber para Java](https://cucumber.io/docs/installation/java/) y [esperas explícitas de Selenium](https://www.selenium.dev/documentation/webdriver/support_features/expected_conditions/).
