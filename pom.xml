@@ -73,6 +73,41 @@
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>net.masterthought</groupId>
+                <artifactId>maven-cucumber-reporting</artifactId>
+                <!-- 5.8.0 es la ultima version cuyo descriptor funciona con Maven 3.
+                     Las posteriores exigen Maven 4 y sus parametros quedan sin aplicar. -->
+                <version>5.8.0</version>
+                <executions>
+                    <execution>
+                        <id>reporte-html</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <projectName>DemoQA Books - Suite de automatización</projectName>
+                            <inputDirectory>${run.directory}</inputDirectory>
+                            <jsonFiles>
+                                <param>cucumber.json</param>
+                            </jsonFiles>
+                            <outputDirectory>${run.directory}/reporte</outputDirectory>
+                            <buildNumber>${maven.build.timestamp}</buildNumber>
+                            <!-- Quien decide si la build pasa o falla es surefire.
+                                 Si el reporte tambien fallara, un caso en rojo daria
+                                 dos errores distintos y el segundo no dice cual fue. -->
+                            <checkBuildResult>false</checkBuildResult>
+                            <classifications>
+                                <Ambiente>${env}</Ambiente>
+                                <Sitio>https://demoqa.com</Sitio>
+                                <Navegador>Google Chrome</Navegador>
+                                <Headless>${headless}</Headless>
+                            </classifications>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

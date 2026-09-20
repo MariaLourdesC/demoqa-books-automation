@@ -1,3 +1,4 @@
 target/
 config/*.local.properties
 .DS_Store
+.vscode/

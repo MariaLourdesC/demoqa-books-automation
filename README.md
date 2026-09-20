@@ -2,7 +2,7 @@
 
 ## Qué estoy validando
 
-Por ahora tengo cubierto el login, en sus dos caras.
+Tengo cubiertos los cinco puntos del desafío: el login en sus dos caras, la búsqueda de libros con palabra clave existente e inexistente, y el estudio de factibilidad de New User.
 
 El **login exitoso**: ingreso con un usuario que ya está creado y valido que se abre su perfil, que aparece su nombre de usuario y que está la opción para cerrar sesión. Este caso no crea usuarios; para ejecutarlo necesito un usuario válido de DemoQA.
 
@@ -13,6 +13,10 @@ El **login fallido**, en las tres formas en que puede fallar:
 - Enviando el formulario con los campos vacíos.
 
 Las dos primeras las agrupé en un mismo esquema porque el sitio las trata igual. La tercera va aparte, y más abajo explico por qué.
+
+La **búsqueda de libros**, con palabras que están en el catálogo y con una que no está. Cuando la palabra existe no me alcanza con que aparezcan resultados: compruebo que *todos* los que aparecen corresponden a lo que busqué.
+
+El **registro de usuario**, solo en la parte que se puede automatizar sin resolver el captcha. La justificación completa está en [docs/factibilidad-new-user.md](docs/factibilidad-new-user.md).
 
 ## Qué uso y para qué
 
@@ -74,10 +78,13 @@ mvn test -Dheadless=true
 Para correr un grupo de casos uso las etiquetas del escenario:
 
 ```sh
-mvn test -Dcucumber.filter.tags="@login_exitoso"
+mvn test -Dcucumber.filter.tags="@login"
+mvn test -Dcucumber.filter.tags="@books"
+mvn test -Dcucumber.filter.tags="@new_user"
 mvn test -Dcucumber.filter.tags="@login_fallido"
-mvn test -Denv=qa -Dcucumber.filter.tags="@login"
 ```
+
+Hoy la suite tiene 11 escenarios: 4 de login, 5 de búsqueda y 2 de registro. Conviene no contar los bloques del archivo: un `Esquema del escenario` se ejecuta una vez por cada fila de `Ejemplos`, así que 2 bloques en `books.feature` dan 5 ejecuciones.
 
 El runner no tiene ninguna etiqueta fija, así que `mvn test` sin filtro ejecuta todo lo que haya escrito.
 
@@ -101,6 +108,10 @@ Cada caso de login fallido comprueba tres cosas, no una:
 
 La segunda es la que de verdad importa. Validar solo el mensaje no alcanza: una aplicación rota podría mostrar el error y dejarme entrar igual, y la prueba pasaría sin darse cuenta.
 
+En la búsqueda sigo el mismo criterio. No compruebo que aparezcan resultados, compruebo que **todos** los resultados coinciden con lo que busqué. Contar filas no detectaría un buscador que devuelve cualquier cosa. No fijo la cantidad exacta esperada a propósito: sería una aserción más estricta pero se rompería el día que cambie el catálogo, y lo que quiero verificar es la relevancia, no el inventario.
+
+Separé los `Ejemplos` de la búsqueda en dos bloques: palabras que están en el título y palabras que están en el autor o la editorial. Así queda documentado que el buscador filtra por el registro completo y no solo por el título.
+
 ## Cómo está organizado
 
 ```text
@@ -111,13 +122,21 @@ src/test/java/com/demoqa/
   config/TestConfig.java      Carga el ambiente y los datos del usuario
   pages/LoginPage.java        Campos, acciones y mensaje de error del login
   pages/ProfilePage.java      Elementos del perfil
+  pages/BooksPage.java        Buscador y tabla de resultados
+  pages/RegisterPage.java     Formulario de alta y detección del captcha
   steps/LoginSteps.java       Conecta Gherkin con las páginas y validaciones
+  steps/BooksSteps.java       Pasos de la búsqueda de libros
+  steps/RegisterSteps.java    Pasos del formulario de registro
   hooks/TestHooks.java        Abre Chrome, guarda la evidencia y lo cierra
   support/TestContext.java    Comparte el navegador dentro de cada escenario
   runners/RunCucumberTest.java Ejecuta los casos con Cucumber
 src/test/resources/
   config/qa.properties        URL y tiempos máximos de espera
-  features/login.feature      Casos escritos en español
+  features/login.feature      Casos de login
+  features/books.feature      Casos de búsqueda
+  features/register.feature   Casos de registro que no dependen del captcha
+docs/
+  factibilidad-new-user.md    Estudio de factibilidad de New User
 target/runs/                  Reportes y evidencias de cada ejecución
 ```
 
@@ -144,6 +163,11 @@ Cada `mvn test` crea una carpeta con fecha y hora UTC dentro de `target/runs/`. 
 - `screenshots/`: captura de cómo terminó cada escenario, pase o falle.
 - `login-...-resultado.txt`: nombre del caso, estado, ambiente y fecha.
 - `surefire/`: resultado de Maven y JUnit.
+- `reporte/cucumber-html-reports/`: el reporte presentable, con gráficos y las capturas embebidas.
+
+El reporte presentable lo genera `maven-cucumber-reporting` a partir de `cucumber.json`, y se arma solo al terminar `mvn test`. Para verlo abro `reporte/cucumber-html-reports/overview-features.html`. Tiene una vista por feature, otra por paso y otra por etiqueta, y arriba muestra el ambiente, el sitio, el navegador y si se corrió en headless.
+
+Una nota sobre la versión del plugin: quedó fijada en `5.8.0` a propósito. Las versiones posteriores están compiladas para Maven 4 y, con Maven 3, su configuración se ignora en silencio y la generación falla.
 
 Cuando una validación falla, el reporte muestra el valor esperado y el que se obtuvo. Eso fue a propósito: las páginas devuelven lo que leyeron y la comparación se hace en el paso, así no me queda un error de espera agotada que no explica nada.
 
@@ -153,20 +177,32 @@ Los reportes y capturas quedan fuera de Git. La captura del perfil puede mostrar
 
 ## Qué se ha comprobado
 
-La suite completa se ejecutó el 20 de septiembre de 2026 con Chrome en modo headless: cuatro escenarios, ninguno fallido.
+La suite completa se ejecutó el 20 de septiembre de 2026 con Chrome en modo headless: once escenarios, ninguno fallido.
 
 ```text
-Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 11, Failures: 0, Errors: 0, Skipped: 0
 ```
 
 El reporte de esa corrida quedó en `target/runs/20260920-162005-524/`.
 
 Los localizadores se verificaron contra el sitio real: los campos del login tienen los identificadores `userName` y `password`, el botón tiene `login`, el perfil presenta `userName-value` y un botón `Logout`. El mensaje de error del login se renderiza en `<p id="name">Invalid username or password!</p>`.
 
-Una observación que anoté mientras probaba a mano: DemoQA devuelve el mismo mensaje tanto si el usuario no existe como si la contraseña es incorrecta. No es un descuido, es lo correcto: un mensaje distinto para cada caso le permitiría a un atacante averiguar qué usuarios existen.
+En la lista de libros me encontré con que DemoQA **ya no usa ReactTable**. Los localizadores `rt-tr-group`, `rt-td` y `rt-noData` que aparecen en casi todos los ejemplos publicados ya no existen: hoy es una `<table>` HTML normal. Lo comprobé volcando el DOM real antes de escribir el Page Object.
+
+## Lo que encontré mientras probaba
+
+**El mismo mensaje para los dos errores de login.** DemoQA responde igual si el usuario no existe que si la contraseña es incorrecta. No es un descuido, es lo correcto: un mensaje distinto para cada caso le permitiría a un atacante averiguar qué usuarios existen.
+
+**"ISTQB Fundamentals" no está en el catálogo.** El enunciado lo propone como ejemplo de palabra clave existente, pero consulté el catálogo en `GET /BookStore/v1/Books` y tiene ocho libros, ninguno de ISTQB. Son todos de JavaScript, Git y ECMAScript. Así que usé palabras que sí existen para el caso de búsqueda con resultados, y le di a "ISTQB Fundamentals" el lugar que le corresponde: el caso de búsqueda sin resultados.
+
+**La búsqueda sin resultados no avisa nada.** Cuando no hay coincidencias la tabla queda vacía y no aparece ningún mensaje. Lo único que cambia es el paginador, que pasa a decir `Page 1 of 0`. El usuario no puede distinguir entre "no hay resultados" y "algo se rompió". Lo uso como validación porque es lo único observable, pero me parece un defecto de experiencia de uso.
+
+**El captcha protege la pantalla pero no la API.** El formulario de registro exige resolver un reCAPTCHA, pero `POST /Account/v1/User` crea usuarios sin pedir nada y devuelve `201`. La protección debería estar también del lado del servidor. Lo detallo en el estudio de factibilidad.
+
+**El mensaje de la política de contraseñas no coincide con lo que valida.** Dice pedir "one non alphanumeric character", pero rechaza una contraseña terminada en punto y acepta la misma con `@`.
 
 ## Alcance actual
 
-Está cubierto el login, exitoso y fallido. Quedan pendientes la búsqueda de libros con palabra clave existente, la búsqueda con palabra clave inexistente y el estudio de factibilidad de New User.
+Los cinco puntos del desafío están entregados. Si siguiera, agregaría la ejecución en integración continua y la creación del usuario de prueba por API como precondición, que es justo lo que recomiendo en el estudio de factibilidad.
 
 Referencias: [instalación de Cucumber para Java](https://cucumber.io/docs/installation/java/) y [esperas explícitas de Selenium](https://www.selenium.dev/documentation/webdriver/support_features/expected_conditions/).
